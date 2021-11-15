@@ -25,18 +25,15 @@ use WideWorldImporters
 1. Довставлять в базу пять записей используя insert в таблицу Customers или Suppliers
 */
 
--- select * from Sales.Customers
+if exists (select * from tempdb..sysobjects where id = object_id('tempdb..#InsRows'))
+	drop table #InsRows
+create table #InsRows (InsCustomerID int)
 
--- !!!!!!!!!!!!!!!!!!!!!! Первые 3 запроса выполнять вместе, чтобы таблица @InsRows была заполнена, нужные части запросов раскомменировать
-
-declare @InsRows table (InsCustomerID int)
-declare @DelCust int 
-
---insert into Sales.Customers (CustomerName, BillToCustomerID, CustomerCategoryID, BuyingGroupID, PrimaryContactPersonID, AlternateContactPersonID, DeliveryMethodID,
---							DeliveryCityID, PostalCityID, CreditLimit, AccountOpenedDate, StandardDiscountPercentage, IsStatementSent, IsOnCreditHold, PaymentDays,
---							PhoneNumber, FaxNumber, DeliveryRun, RunPosition, WebsiteURL, DeliveryAddressLine1, DeliveryAddressLine2, DeliveryPostalCode,
---							DeliveryLocation, PostalAddressLine1, PostalAddressLine2, PostalPostalCode, LastEditedBy)
---output inserted.CustomerID into @InsRows (InsCustomerID)
+insert into Sales.Customers (CustomerName, BillToCustomerID, CustomerCategoryID, BuyingGroupID, PrimaryContactPersonID, AlternateContactPersonID, DeliveryMethodID,
+							DeliveryCityID, PostalCityID, CreditLimit, AccountOpenedDate, StandardDiscountPercentage, IsStatementSent, IsOnCreditHold, PaymentDays,
+							PhoneNumber, FaxNumber, DeliveryRun, RunPosition, WebsiteURL, DeliveryAddressLine1, DeliveryAddressLine2, DeliveryPostalCode,
+							DeliveryLocation, PostalAddressLine1, PostalAddressLine2, PostalPostalCode, LastEditedBy)
+output inserted.CustomerID into #InsRows (InsCustomerID)
 select top 5 concat(CustomerName, '111') as CustomerName, BillToCustomerID, CustomerCategoryID, BuyingGroupID, PrimaryContactPersonID, AlternateContactPersonID, DeliveryMethodID,
 DeliveryCityID, PostalCityID, CreditLimit, AccountOpenedDate, StandardDiscountPercentage, IsStatementSent, IsOnCreditHold, PaymentDays,
 PhoneNumber, FaxNumber, DeliveryRun, RunPosition, WebsiteURL, DeliveryAddressLine1, DeliveryAddressLine2, DeliveryPostalCode,
@@ -44,35 +41,29 @@ DeliveryLocation, PostalAddressLine1, PostalAddressLine2, PostalPostalCode, Last
 from Sales.Customers c
 order by c.CustomerID
 
---select @@rowcount
-
---select * from @InsRows
-
---select * from Sales.Customers
-
 /*
 2. Удалите одну запись из Customers, которая была вами добавлена
 */
 
-select top 1 @DelCust = i.InsCustomerID from @InsRows i order by i.InsCustomerID
-
-select *
--- delete c
+-- select *
+delete c
 from Sales.Customers c
-where c.CustomerID = @DelCust
+where c.CustomerID = (select top 1 i.InsCustomerID from #InsRows i order by i.InsCustomerID)
 
 /*
 3. Изменить одну запись, из добавленных через UPDATE
 */
 
-select *
--- update c set c.CustomerName = 'Marina111'
+-- select *
+update c set c.CustomerName = 'Marina111'
 from Sales.Customers c
-where c.CustomerID = (select top 1 i.InsCustomerID from @InsRows i where i.InsCustomerID <> @DelCust order by i.InsCustomerID)
+join (select top 1 c.CustomerID
+	from Sales.Customers c
+	join #InsRows i on i.InsCustomerID = c.CustomerID
+	order by i.InsCustomerID) ic on ic.CustomerID = c.CustomerID
 
---select * 
---from Sales.Customers c
---join @InsRows i on i.InsCustomerID = c.CustomerID
+
+-- select * from Sales.Customers c order by c.CustomerID desc
 
 /*
 4. Написать MERGE, который вставит запись в клиенты, если ее там нет, и изменит если она уже есть
@@ -80,7 +71,9 @@ where c.CustomerID = (select top 1 i.InsCustomerID from @InsRows i where i.InsCu
 
 declare @Customers table (Customer_id int, CustomerName nvarchar(100))
 insert into @Customers (Customer_id, CustomerName)
-select 1063 as Customer_id, 'Marina111' as CustomerName
+select c.CustomerID, c.CustomerName
+from Sales.Customers c
+where c.CustomerName = 'Marina111'
 
 select * from @Customers
 
@@ -120,43 +113,39 @@ go
 declare @ServerName nvarchar(50) = @@servername,
 		@DynSql nvarchar(200)
 
---select @DynSql = 'bcp "[WideWorldImporters].Application.Countries" out  "C:\1\Countries.txt" -T -w -t, -S' + @ServerName
-
---select @ServerName as ServerName, @DynSql as DynSql
-
---exec master..xp_cmdshell @DynSql
-
 -- Другой разделитель 
 select @DynSql = 'bcp "[WideWorldImporters].Application.Countries" out  "C:\1\Countries111.txt" -T -w -t"@eu&$1&" -S' + @ServerName
   
-select @ServerName as ServerName, @DynSql as DynSql
+-- select @ServerName as ServerName, @DynSql as DynSql
 
-select count(*) as CountriesRowCount from Application.Countries
+-- select count(*) as CountriesRowCount from Application.Countries
    
 exec master..xp_cmdshell @DynSql
 
 -- select * from Application.Countries
 
 -- 5.2 bulk insert
---create table [Application].[Countries_test]
---(
---	[CountryID] [int] not null,
---	[CountryName] [nvarchar](60) not null,
---	[FormalName] [nvarchar](60) not null,
---	[IsoAlpha3Code] [nvarchar](3) null,
---	[IsoNumericCode] [int] null,
---	[CountryType] [nvarchar](20) null,
---	[LatestRecordedPopulation] [bigint] null,
---	[Continent] [nvarchar](30) not null,
---	[Region] [nvarchar](30) not null,
---	[Subregion] [nvarchar](30) not null,
---	[Border] [geography] null,
---	[LastEditedBy] [int] not null,
---	[ValidFrom] [datetime2](7) not null,
---	[ValidTo] [datetime2](7) not null
---)
+drop table if exists [Application].[Countries_test]
 
-select * from Application.Countries_test
+create table [Application].[Countries_test]
+(
+	[CountryID] [int] not null,
+	[CountryName] [nvarchar](60) not null,
+	[FormalName] [nvarchar](60) not null,
+	[IsoAlpha3Code] [nvarchar](3) null,
+	[IsoNumericCode] [int] null,
+	[CountryType] [nvarchar](20) null,
+	[LatestRecordedPopulation] [bigint] null,
+	[Continent] [nvarchar](30) not null,
+	[Region] [nvarchar](30) not null,
+	[Subregion] [nvarchar](30) not null,
+	[Border] [geography] null,
+	[LastEditedBy] [int] not null,
+	[ValidFrom] [datetime2](7) not null,
+	[ValidTo] [datetime2](7) not null
+)
+
+-- select * from Application.Countries_test
 
 bulk insert [WideWorldImporters].[Application].[Countries_test]
 from "C:\1\Countries111.txt"
@@ -169,6 +158,6 @@ with (batchsize = 1000,
 
 select * from Application.Countries_test
 
-select count(*) as Countries_testRowCount from Application.Countries_test
+-- select count(*) as Countries_testRowCount from Application.Countries_test
 
--- truncate table Application.Countries_test
+truncate table Application.Countries_test
