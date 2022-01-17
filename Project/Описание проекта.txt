@@ -1,0 +1,16 @@
+Интернет-магазин для продажи чая
+
+Сущности:
+Страны - Countries
+Поставщики - Suppliers
+Единицы измерения - Units
+Товары - Products
+Связь товаров и ед. изм. - ProductUnits
+Покупатели - Customers
+Заказы - Orders
+Состав заказа - OrderItems
+Продажа - Sales
+Состав продажи - SalesItems
+Остатки на складе - WarehouseSummary
+Возвраты - Returns
+
