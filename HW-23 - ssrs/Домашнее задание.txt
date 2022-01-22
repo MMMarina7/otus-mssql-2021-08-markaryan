@@ -1,0 +1,4 @@
+Создать отчет в SSRS или PowerBI
+
+Цель:
+Для вашего проекта создать отчет в SQL Server Reporting Services или PowerBI
